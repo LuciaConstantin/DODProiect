@@ -133,6 +133,14 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="hello.c" />
+    <ClCompile Include="event.cpp" />
+    <ClCompile Include="entity.cpp" />
+    <ClCompile Include="Rectangle.cpp" />
+    <ClCompile Include="Spawn.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="entity.h" />
+    <ClInclude Include="Spawn.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
