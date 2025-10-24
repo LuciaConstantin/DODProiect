@@ -83,6 +83,11 @@ bool InitApplication() {
 }
 
 
+bool checkCollision(entity& a, entity& b) {
+	return (a.getX() < b.getX() + b.getWidth()) && (a.getX() + a.getWidth() > b.getX()) &&
+		(a.getY() < b.getY() + b.getHeight()) && (a.getY() + a.getHeight() > b.getY());
+}
+
 
 int main(int argc, char* argv[]) {
 
@@ -95,14 +100,55 @@ int main(int argc, char* argv[]) {
 	bool running = true;
 
 	Spawn spawner;
-	spawner.spawnEntity(10, app.screen.width, app.screen.height);
+	spawner.spawnEntity(20, app.screen.width, app.screen.height);
 
 	while (running) {
 		ClearScreen(app.renderer);
 
-		// check the square's state 
-
 		std::vector<entity>& obj = spawner.getObjects();
+
+
+		for (int i = 0; i < obj.size(); ++i) {
+			for (int j = i + 1; j < obj.size(); ++j) {
+				if (checkCollision(obj[i], obj[j])) {
+					int dx = obj[j].getX() - obj[i].getX();
+					int dy = obj[j].getY() - obj[i].getY();
+
+					// coliziune pe verticala sau orizontala
+					if (abs(dx) > abs(dy)) {
+						if (dx > 0) {
+							obj[i].setState(MOVING_LEFT);
+							obj[j].setState(MOVING_RIGHT);
+						}
+						else {
+							obj[i].setState(MOVING_RIGHT);
+							obj[j].setState(MOVING_LEFT);
+						}
+					}
+					else {
+						if (dy > 0) {
+							obj[i].setState(MOVING_UP);
+							obj[j].setState(MOVING_DOWN);
+						}
+						else {
+							obj[i].setState(MOVING_DOWN);
+							obj[j].setState(MOVING_UP);
+						}
+					}
+
+					auto clamp = [](int value, int min, int max) {
+						return (value < min) ? min : (value > max ? max : value);
+						};
+
+					obj[i].setX(clamp(obj[i].getX() - dx / 10, 0, app.screen.width - obj[i].getWidth()));
+					obj[i].setY(clamp(obj[i].getY() - dy / 10, 0, app.screen.height - obj[i].getHeight()));
+					obj[j].setX(clamp(obj[j].getX() + dx / 10, 0, app.screen.width - obj[j].getWidth()));
+					obj[j].setY(clamp(obj[j].getY() + dy / 10, 0, app.screen.height - obj[j].getHeight()));
+				}
+			}
+		}
+
+
 		for (entity& en : obj) {
 
 			switch (en.getState()) {

@@ -11,7 +11,7 @@ private:
 	int x, y;
 	int w = 20, h= 20;
 	entityState state;
-	int step = 1;
+	double step = 1;
 
 public:
 	entity() : x(0), y(0) {
