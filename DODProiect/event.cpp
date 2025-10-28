@@ -4,7 +4,6 @@
 #include "Button.h"
 
 
-
 namespace Colors {
 	const SDL_Color BLACK = { 0, 0, 0, SDL_ALPHA_OPAQUE };
 	const SDL_Color GREEN = { 0, 255, 0, SDL_ALPHA_OPAQUE };
@@ -45,10 +44,9 @@ struct App {
 	Graphics::Screen screen;
 	Graphics::smallScreen subScreen;
 	Graphics::speedButtons buttons;
+	gameMode game = NSEW; // RANDOM
 
 
-
-	//Square square = { 72, 72, screen.centerX, screen.centerY, IDLE, DEFAULT_STEP };
 
 } app;
 
@@ -137,43 +135,74 @@ bool checkCollision(entity& a, entity& b) {
 		(a.getY() < b.getY() + b.getHeight()) && (a.getY() + a.getHeight() > b.getY());
 }
 
+void random(std::vector<entity>& obj) {
+	for (size_t i = 0; i < obj.size(); ++i) {
+		for (size_t j = i + 1; j < obj.size(); ++j) {
+			if (checkCollision(obj[i], obj[j])) {
 
-int main(int argc, char* argv[]) {
+				obj[i].setxRand(-obj[i].getxRand());
+				obj[i].setyRand(-obj[i].getyRand());
+				obj[j].setxRand(-obj[j].getxRand());
+				obj[j].setyRand(-obj[j].getyRand());
 
-	if (!InitApplication()) {
-		ShutdownApplication();
-		return EXIT_FAILURE;
+
+				obj[i].setX(obj[i].getX() + obj[i].getxRand() * obj[i].getStep());
+				obj[i].setY(obj[i].getY() + obj[i].getyRand() * obj[i].getStep());
+				obj[j].setX(obj[j].getX() + obj[j].getxRand() * obj[j].getStep());
+				obj[j].setY(obj[j].getY() + obj[j].getyRand() * obj[j].getStep());
+			}
+
+		}
 	}
 
-	SDL_Event event;
-	bool running = true;
+	// RANDOM movement and escaping from the window
+	if (app.game == RANDOM) {
+		for (entity& en : obj) {
+			int futureX = en.getX() + en.getxRand() * en.getStep();
+			int futureY = en.getY() + en.getyRand() * en.getStep();
 
-	Spawn spawner;
-	spawner.spawnEntity(20, app.screen.width, app.screen.height);
+			bool bounceX = false;
+			bool bounceY = false;
 
-	Button buttonInc(app.buttons.xInc, app.buttons.yInc, 'i');
-	Button buttonDec(app.buttons.xDec, app.buttons.yDec, 'd');
+			if (futureY - en.getHeight() / 2 <= 0) {
+				bounceY = true;
+			}
+			else if (futureY + en.getHeight() / 2 >= app.screen.height) {
+				bounceY = true;
+			}
 
-	
+			if (futureX + en.getWidth() / 2 >= app.screen.width) {
+				bounceX = true;
+			}
+			else if (futureX - en.getWidth() / 2 <= 0) {
+				bounceX = true;
+			}
+
+			if (bounceX) {
+				en.setxRand(-en.getxRand());
+
+			}
+			if (bounceY) {
+				en.setyRand(-en.getyRand());
+			}
 
 
-	while (running) {
-		ClearScreen(app.renderer, app.subRenderer);
+		}
+	}
 
-		// draw buttons for entity speed
-		buttonDec.drawButton(app.subRenderer);
-		buttonInc.drawButton(app.subRenderer);
+	if (app.game == RANDOM) {
+		for (entity& en : obj) {
+			en.setX(en.getX() + en.getxRand() * en.getStep());
+			en.setY(en.getY() + en.getyRand() * en.getStep());
+		}
 
-		SDL_RenderPresent(app.subRenderer);
+	}
 
+}
 
-		std::vector<entity>& obj = spawner.getObjects();
-
-		buttonDec.drawButton(app.subRenderer);
-
-
-
-		// check entity movement and collision
+void NSEWMove(std::vector<entity>& obj) {
+	// check entity movement and collision
+		
 		for (int i = 0; i < obj.size(); ++i) {
 			for (int j = i + 1; j < obj.size(); ++j) {
 				if (checkCollision(obj[i], obj[j])) {
@@ -214,7 +243,10 @@ int main(int argc, char* argv[]) {
 			}
 		}
 
+		
+
 		// entity movement and escaping from the window
+		
 		for (entity& en : obj) {
 
 			switch (en.getState()) {
@@ -274,6 +306,53 @@ int main(int argc, char* argv[]) {
 				break;
 			}
 		}
+
+		
+}
+
+int main(int argc, char* argv[]) {
+
+	if (!InitApplication()) {
+		ShutdownApplication();
+		return EXIT_FAILURE;
+	}
+
+	SDL_Event event;
+	bool running = true;
+
+	Spawn spawner;
+	spawner.spawnEntity(10, app.screen.width, app.screen.height, app.game);
+
+	Button buttonInc(app.buttons.xInc, app.buttons.yInc, 'i');
+	Button buttonDec(app.buttons.xDec, app.buttons.yDec, 'd');
+
+	
+
+
+	while (running) {
+		ClearScreen(app.renderer, app.subRenderer);
+
+		// draw buttons for entity speed
+		buttonDec.drawButton(app.subRenderer);
+		buttonInc.drawButton(app.subRenderer);
+
+		SDL_RenderPresent(app.subRenderer);
+
+
+		std::vector<entity>& obj = spawner.getObjects();
+
+		buttonDec.drawButton(app.subRenderer);
+
+
+		if (app.game == RANDOM) {
+			random(obj);
+
+		}
+		else {
+			NSEWMove(obj);
+
+		}
+		
 
 		// keyboard events
 		while (SDL_PollEvent(&event)) {

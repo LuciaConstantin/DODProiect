@@ -47,6 +47,16 @@ void entity::setY(int newY)
 	y = newY;
 }
 
+void entity::setxRand(int newX)
+{
+	xRand = newX;
+}
+
+void entity::setyRand(int newY)
+{
+	yRand = newY;
+}
+
 entityState entity::getState()
 {
 	return state;
@@ -75,4 +85,14 @@ int entity::getWidth()
 int entity::getHeight()
 {
 	return h;
+}
+
+int entity::getxRand()
+{
+	return xRand;
+}
+
+int entity::getyRand()
+{
+	return yRand;
 }

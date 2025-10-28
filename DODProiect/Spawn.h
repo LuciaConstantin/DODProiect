@@ -11,8 +11,10 @@ private:
 	std::vector<entity> obj;
 
 public:
-	void spawnEntity(int count, int screenW, int screenH);
+	void spawnEntity(int count, int screenW, int screenH, gameMode mode);
+
 	void drawAll(SDL_Renderer* renderer);
 	std::vector<entity>& getObjects();
+
 };
 

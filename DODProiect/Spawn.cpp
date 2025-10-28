@@ -1,7 +1,7 @@
 #include "Spawn.h"
 
 
-void Spawn::spawnEntity(int count, int screenW, int screenH)
+void Spawn::spawnEntity(int count, int screenW, int screenH, gameMode mode)
 {
 	srand((unsigned)time(NULL));
 	entityState state;
@@ -10,31 +10,58 @@ void Spawn::spawnEntity(int count, int screenW, int screenH)
 		int randomX = rand() % (screenW - 30);
 		int randomY = rand() % (screenH - 15);
 	
-		switch (rand() % 5) {
-		case 1: {
-			state = MOVING_UP;
-			break;
+		if (mode == NSEW) {
+			switch (rand() % 5) {
+			case 1: {
+				state = MOVING_UP;
+				break;
+			}
+			case 2: {
+				state = MOVING_DOWN;
+				break;
+			}
+			case 3: {
+				state = MOVING_LEFT;
+				break;
+			}
+			case 4: {
+				state = MOVING_RIGHT;
+				break;
+			}
+			default: {
+				state = IDLE;
+				break;
+			}
+			}
+			obj.emplace_back(randomX, randomY, state);
+
 		}
-		case 2: {
-			state = MOVING_DOWN;
-			break;
+		else {
+			int minVal = -2;
+			int maxVal = 2;
+
+			int xRand, yRand;
+
+			do {
+				xRand = rand() % (maxVal - minVal + 1) + minVal;
+				yRand = rand() % (maxVal - minVal + 1) + minVal;
+			} while (xRand == 0 && yRand == 0);
+			
+			obj.emplace_back(randomX, randomY, RANDOM_MOVEMENT, xRand, yRand);
+
 		}
-		case 3: {
-			state = MOVING_LEFT;
-			break;
-		}
-		case 4: {
-			state = MOVING_RIGHT;
-			break;
-		}
-		default: {
-			state = IDLE;
-			break;
-		}
-		}
-		obj.emplace_back(randomX, randomY, state);
+		
 	}
 }
+
+
+
+
+
+
+
+
+
 
 
 void Spawn::drawAll(SDL_Renderer* renderer) {
