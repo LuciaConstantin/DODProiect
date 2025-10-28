@@ -1,12 +1,14 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include "Spawn.h"
+#include "Button.h"
+
 
 
 namespace Colors {
 	const SDL_Color BLACK = { 0, 0, 0, SDL_ALPHA_OPAQUE };
 	const SDL_Color GREEN = { 0, 255, 0, SDL_ALPHA_OPAQUE };
-
+	const SDL_Color WHITE = { 255, 255, 255, SDL_ALPHA_OPAQUE };
 }
 
 namespace Graphics {
@@ -15,6 +17,18 @@ namespace Graphics {
 		const int height = 900;
 		const int centerX = width / 2;
 		const int centerY = height / 2;
+	};
+	struct smallScreen {
+		const int width = 400;
+		const int height = 300;
+	};
+
+	struct speedButtons {
+		const int xDec = 50;
+		const int yDec = 50;
+		const int xInc = 150;
+		const int yInc = 50;
+		const int distanceBetween = xInc - xDec;
 	};
 
 }
@@ -25,7 +39,14 @@ struct App {
 	SDL_Window* window = nullptr;
 	SDL_Renderer* renderer = nullptr;
 
+	SDL_Window* subWindow = nullptr;
+	SDL_Renderer* subRenderer = nullptr;
+
 	Graphics::Screen screen;
+	Graphics::smallScreen subScreen;
+	Graphics::speedButtons buttons;
+
+
 
 	//Square square = { 72, 72, screen.centerX, screen.centerY, IDLE, DEFAULT_STEP };
 
@@ -38,13 +59,19 @@ bool InitSDL() {
 		std::cout << "SDL_Init failed with error: " << SDL_GetError() << std::endl;
 		return false;
 	}
+
 	return true;
 }
 
 
-static void ClearScreen(SDL_Renderer* renderer) {
+static void ClearScreen(SDL_Renderer* renderer, SDL_Renderer* subRenderer) {
 	SDL_SetRenderDrawColor(renderer, Colors::BLACK.r, Colors::BLACK.g, Colors::BLACK.b, Colors::BLACK.a);
 	SDL_RenderClear(renderer);
+
+	SDL_SetRenderDrawColor(subRenderer, Colors::WHITE.r, Colors::WHITE.g, Colors::WHITE.b, Colors::WHITE.a);
+	SDL_RenderClear(subRenderer);
+
+
 }
 
 
@@ -57,6 +84,16 @@ void ShutdownApplication() {
 	if (app.renderer != nullptr) {
 		SDL_DestroyRenderer(app.renderer);
 		app.renderer = nullptr;
+	}
+
+	if (app.subWindow != nullptr) {
+		SDL_DestroyWindow(app.subWindow);
+		app.subWindow = nullptr;
+	}
+
+	if (app.subRenderer != nullptr) {
+		SDL_DestroyRenderer(app.subRenderer);
+		app.subRenderer = nullptr;
 	}
 
 	SDL_Quit();
@@ -78,6 +115,18 @@ bool InitApplication() {
 	}
 
 	app.renderer = SDL_CreateRenderer(app.window, nullptr);
+
+
+	app.subWindow = SDL_CreateWindow("Hello small window", app.subScreen.width, app.subScreen.height, SDL_WINDOW_OPENGL);
+
+	if (!app.subWindow) {
+		std::cout << "Unable to create the small window. Error: " << SDL_GetError() << std::endl;
+		ShutdownApplication();
+		return false;
+	}
+
+	app.subRenderer = SDL_CreateRenderer(app.subWindow, nullptr);
+
 
 	return true;
 }
@@ -102,12 +151,29 @@ int main(int argc, char* argv[]) {
 	Spawn spawner;
 	spawner.spawnEntity(20, app.screen.width, app.screen.height);
 
+	Button buttonInc(app.buttons.xInc, app.buttons.yInc, 'i');
+	Button buttonDec(app.buttons.xDec, app.buttons.yDec, 'd');
+
+	
+
+
 	while (running) {
-		ClearScreen(app.renderer);
+		ClearScreen(app.renderer, app.subRenderer);
+
+		// draw buttons for entity speed
+		buttonDec.drawButton(app.subRenderer);
+		buttonInc.drawButton(app.subRenderer);
+
+		SDL_RenderPresent(app.subRenderer);
+
 
 		std::vector<entity>& obj = spawner.getObjects();
 
+		buttonDec.drawButton(app.subRenderer);
 
+
+
+		// check entity movement and collision
 		for (int i = 0; i < obj.size(); ++i) {
 			for (int j = i + 1; j < obj.size(); ++j) {
 				if (checkCollision(obj[i], obj[j])) {
@@ -148,7 +214,7 @@ int main(int argc, char* argv[]) {
 			}
 		}
 
-
+		// entity movement and escaping from the window
 		for (entity& en : obj) {
 
 			switch (en.getState()) {
@@ -209,19 +275,46 @@ int main(int argc, char* argv[]) {
 			}
 		}
 
-
-		if (SDL_PollEvent(&event)) {
+		// keyboard events
+		while (SDL_PollEvent(&event)) {
 			switch (event.type) {
-			case SDL_EVENT_KEY_DOWN: {
+			case SDL_EVENT_KEY_DOWN:
 				if (event.key.scancode == SDL_SCANCODE_ESCAPE)
 					running = false;
-
 				break;
-			}
-			case SDL_EVENT_QUIT: {
+
+			case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
 				running = false;
 				break;
-			}
+
+			case SDL_EVENT_QUIT:
+				running = false;
+				break;
+			case SDL_EVENT_MOUSE_BUTTON_DOWN:
+				/// check for increase/decrease speed in the small window
+				if (event.button.windowID == SDL_GetWindowID(app.subWindow)) {
+					// get mouse position
+					float x = -1.f;
+					float y = -1.f;
+					SDL_GetMouseState(&x, &y);
+
+					if (x >= buttonDec.getButtonX() && x <= buttonDec.getButtonX() + buttonDec.getButtonW()
+						&& y >= buttonDec.getButtonY() && y <= buttonDec.getButtonY() + buttonDec.getButtonH()) {
+							for (entity& en : obj) {
+								buttonDec.clickButton(en);
+							}
+							
+					}
+					else if (x >= buttonInc.getButtonX() && x <= buttonInc.getButtonX() + buttonInc.getButtonW() &&
+						y >= buttonInc.getButtonY() && y <= buttonInc.getButtonY() + buttonInc.getButtonH()) {
+							for (entity& en : obj) {
+								buttonInc.clickButton(en);
+							}
+					}
+				}
+
+				break;
+
 			default:
 				break;
 			}

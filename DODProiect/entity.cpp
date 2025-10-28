@@ -10,9 +10,26 @@ void entity::drawEntity(SDL_Renderer* renderer)
 	rect.h = h;
 	rect.w = w;
 	
-	SDL_SetRenderDrawColor(renderer, 0, 255, 255, 255);
+	SDL_SetRenderDrawColor(renderer, 36, 219, 193, 255);
 	//SDL_RenderRect(renderer, &rect);
 	SDL_RenderFillRect(renderer, &rect);
+}
+
+void entity::increaseSpeed()
+{
+	if (step + 1 < 10) {
+		step += 1;
+	}
+	
+}
+
+void entity::decreaseSpeed()
+{
+	if (step - 1 > 0) {
+		step -= 1;
+	}
+	else
+		step = 1;
 }
 
 void entity::setState(entityState state)

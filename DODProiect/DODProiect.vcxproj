@@ -132,6 +132,7 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Button.cpp" />
     <ClCompile Include="hello.c" />
     <ClCompile Include="event.cpp" />
     <ClCompile Include="entity.cpp" />
@@ -139,6 +140,7 @@
     <ClCompile Include="Spawn.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Button.h" />
     <ClInclude Include="entity.h" />
     <ClInclude Include="Spawn.h" />
   </ItemGroup>

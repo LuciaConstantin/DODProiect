@@ -22,7 +22,6 @@ public:
 		this->state = state;
 	}
 
-	void drawEntity(SDL_Renderer* renderer);
 	entityState getState();
 	int getX();
 	int getY();
@@ -33,6 +32,10 @@ public:
 	void setState(entityState state);
 	void setX(int newX);
 	void setY(int newY);
+
+	void drawEntity(SDL_Renderer* renderer);
+	void increaseSpeed();
+	void decreaseSpeed();
 
 };
 
