@@ -18,7 +18,7 @@ void entity::drawEntity(SDL_Renderer* renderer)
 void entity::increaseSpeed()
 {
 	if (step + 1 < 10) {
-		step += 1;
+		step += 1.f;
 	}
 	
 }
@@ -26,10 +26,10 @@ void entity::increaseSpeed()
 void entity::decreaseSpeed()
 {
 	if (step - 1 > 0) {
-		step -= 1;
+		step -= 1.f;
 	}
 	else
-		step = 1;
+		step = 1.f;
 }
 
 void entity::setState(entityState state)
@@ -37,22 +37,22 @@ void entity::setState(entityState state)
 	this->state = state;
 }
 
-void entity::setX(int newX)
+void entity::setX(float newX)
 {
 	x = newX;
 }
 
-void entity::setY(int newY)
+void entity::setY(float newY)
 {
 	y = newY;
 }
 
-void entity::setxRand(int newX)
+void entity::setxRand(float newX)
 {
 	xRand = newX;
 }
 
-void entity::setyRand(int newY)
+void entity::setyRand(float newY)
 {
 	yRand = newY;
 }
@@ -62,17 +62,17 @@ entityState entity::getState()
 	return state;
 }
 
-int entity::getX()
+float entity::getX()
 {
 	return x;
 }
 
-int entity::getY()
+float entity::getY()
 {
 	return y;
 }
 
-int entity::getStep()
+float entity::getStep()
 {
 	return step;
 }
@@ -87,12 +87,12 @@ int entity::getHeight()
 	return h;
 }
 
-int entity::getxRand()
+float entity::getxRand()
 {
 	return xRand;
 }
 
-int entity::getyRand()
+float entity::getyRand()
 {
 	return yRand;
 }

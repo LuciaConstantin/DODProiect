@@ -136,13 +136,18 @@
     <ClCompile Include="hello.c" />
     <ClCompile Include="event.cpp" />
     <ClCompile Include="entity.cpp" />
+    <ClCompile Include="main.cpp" />
     <ClCompile Include="Rectangle.cpp" />
     <ClCompile Include="Spawn.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Button.h" />
     <ClInclude Include="entity.h" />
+    <ClInclude Include="resource.h" />
     <ClInclude Include="Spawn.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="DODProiect.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

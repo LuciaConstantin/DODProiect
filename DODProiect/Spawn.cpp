@@ -1,14 +1,15 @@
 #include "Spawn.h"
 
 
-void Spawn::spawnEntity(int count, int screenW, int screenH, gameMode mode)
+void Spawn::spawnEntity(int count, int screenW, int screenH, int screenHStart, gameMode mode)
 {
 	srand((unsigned)time(NULL));
 	entityState state;
+	entity ent;
 
 	for (int i = 0; i < count; i++) {
-		int randomX = rand() % (screenW - 30);
-		int randomY = rand() % (screenH - 15);
+		float randomX = (float)(rand() % (screenW - ent.getWidth()));
+		float randomY = (float)(screenHStart + rand() % (screenH - screenHStart - ent.getHeight()));
 	
 		if (mode == NSEW) {
 			switch (rand() % 5) {
@@ -40,11 +41,11 @@ void Spawn::spawnEntity(int count, int screenW, int screenH, gameMode mode)
 			int minVal = -2;
 			int maxVal = 2;
 
-			int xRand, yRand;
+			float xRand, yRand;
 
 			do {
-				xRand = rand() % (maxVal - minVal + 1) + minVal;
-				yRand = rand() % (maxVal - minVal + 1) + minVal;
+				xRand =(float) (rand() % (maxVal - minVal + 1) + minVal);
+				yRand =(float) (rand() % (maxVal - minVal + 1) + minVal);
 			} while (xRand == 0 && yRand == 0);
 			
 			obj.emplace_back(randomX, randomY, RANDOM_MOVEMENT, xRand, yRand);
@@ -53,13 +54,6 @@ void Spawn::spawnEntity(int count, int screenW, int screenH, gameMode mode)
 		
 	}
 }
-
-
-
-
-
-
-
 
 
 
