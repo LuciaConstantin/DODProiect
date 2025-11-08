@@ -133,6 +133,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Button.cpp" />
+    <ClCompile Include="dodmain.cpp" />
     <ClCompile Include="hello.c" />
     <ClCompile Include="event.cpp" />
     <ClCompile Include="entity.cpp" />
