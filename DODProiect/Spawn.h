@@ -5,6 +5,7 @@
 #include <ctime>
 #include "entity.h"
 
+// class used to store all the entities and the intercations between them
 class Spawn
 {
 private:
@@ -16,6 +17,15 @@ public:
 	void drawAll(SDL_Renderer* renderer);
 	
 	std::vector<entity>& getObjects();
+	
+	float checkOutOfScreenX(float x, int w, int W);
+	
+	float checkOutOfScreenY(float y, int h, int H, int ms);
 
+	void NSEWMove(std::vector<entity>& obj, int w, int h, int s);
+
+	bool checkCollision(entity& a, entity& b);
+
+	void random(std::vector<entity>& obj, int w, int h, int s);
 };
 

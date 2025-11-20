@@ -1,7 +1,7 @@
 #pragma once
 #include "entity.h"
 
-
+// used in a new window separated from the game, in order to increase or decrease entities speed
 class Button
 {
 private:

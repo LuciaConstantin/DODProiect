@@ -1,3 +1,4 @@
+
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <SDL3/SDL_timer.h>
@@ -14,12 +15,11 @@ namespace Colors {
 	const SDL_Color MINT = { 143, 206, 150, SDL_ALPHA_OPAQUE };
 }
 
+// About the game world
 namespace Graphics {
 	struct Screen {
 		const int width = 1800;
 		const int height = 900;
-		const int centerX = width / 2;
-		const int centerY = height / 2;
 		const int messageSpace = 50;
 	};
 
@@ -40,8 +40,7 @@ struct App {
 	Graphics::Screen screen;
 	Graphics::entityDimensions dim;
 
-	Uint64 totalFrameTicks = 0;
-	Uint64 totalFrames = 0;
+	Uint64 totalFrameTicks = 0; // For fps
 
 } app;
 
@@ -97,7 +96,7 @@ bool InitApplication() {
 	return true;
 }
 
-
+// assign values for the entities
 void create(int N, float*& x, float*& y, int*& w, int*& h, float*& step, float*& xRand, float*& yRand) {
 	srand((unsigned)time(NULL));
 
@@ -112,9 +111,11 @@ void create(int N, float*& x, float*& y, int*& w, int*& h, float*& step, float*&
 		x[i] = (float)(rand() % (app.screen.width - w[i]));
 		y[i] = (float)(app.screen.messageSpace + rand() % (app.screen.height - app.screen.messageSpace - h[i]));
 
+		
 		int minVal = -2;
 		int maxVal = 2;
 
+		// ex: rand() % (2 - (-2) + 1 ) + (-2) <=> rand() % 5 - 2  <=> 1 - 2 = -1
 		do {
 			xRand[i] = (float)(rand() % (maxVal - minVal + 1) + minVal);
 			yRand[i] = (float)(rand() % (maxVal - minVal + 1) + minVal);
@@ -124,6 +125,7 @@ void create(int N, float*& x, float*& y, int*& w, int*& h, float*& step, float*&
 
 }
 
+// draw entities as rectangles
 void drawEntities(int N, float* x, float* y, int* w, int* h, SDL_Renderer* renderer) {
 
 	for (int i = 0; i < N; i++) {
@@ -140,7 +142,7 @@ void drawEntities(int N, float* x, float* y, int* w, int* h, SDL_Renderer* rende
 
 }
 
-
+// move on the 0x 0y axes
 void moveEntity(int N, float*& x, float*& y, int* w, int* h, float* step, float* xRand, float* yRand) {
 
 	for (int i = 0; i < N; i++) {
@@ -150,7 +152,9 @@ void moveEntity(int N, float*& x, float*& y, int* w, int* h, float* step, float*
 }
 
 
+// entities can't escape the window, if they collide with the window they bounce back in the opposite direction
 void checkOutOfFrame(int N, float*& x, float*& y, int* w, int* h, float* step, float*& xRand, float*& yRand) {
+	
 	for (int i = 0; i < N; i++) {
 		float futureX = x[i] + xRand[i] * step[i];
 		float futureY = y[i] + yRand[i] * step[i];
@@ -177,7 +181,7 @@ void checkOutOfFrame(int N, float*& x, float*& y, int* w, int* h, float* step, f
 	}
 }
 
-
+// check if after the entities collision the entities are still in the window after the coordinate change
 float checkOutOfScreenX(float x, int w) {
 	if (x + w > app.screen.width) {
 		x = (float)app.screen.width - w;
@@ -201,11 +205,12 @@ float checkOutOfScreenY(float y, int h) {
 }
 
 
-
+// check if the entities collide
 bool checkCollision(float x1, float y1, float x2, float y2, int w1, int h1, int w2, int h2) {
 	return (x1 < x2 + w2) && (x1 + w1 > x2) && (y1 < y2 + h2) && (y1 + h1 > y2);
 }
 
+//  if 2 entities collide they move in the opposite direction and also bounce with half the distance of the entites overlap
 void collision(int N, float*& x, float*& y, float* step, float*& xRand, float*& yRand, int* w, int* h) {
 
 	for (int i = 0; i < N; i++) {
@@ -267,13 +272,13 @@ void collision(int N, float*& x, float*& y, float* step, float*& xRand, float*& 
 
 int main(int argc, char* argv[]) {
 
-	int nEntity = 1500; // number of entities
+	int nEntity = 20; // number of entities
 
 	float* x = new float[nEntity];
 	float* y = new float[nEntity];
 	float* step = new float[nEntity];
-	float* xRand = new float[nEntity];
-	float* yRand = new float[nEntity];
+	float* xRand = new float[nEntity]; // for x axis movement 
+	float* yRand = new float[nEntity]; // for y axis movement
 	int* w = new int[nEntity];
 	int* h = new int[nEntity];
 
@@ -297,7 +302,6 @@ int main(int argc, char* argv[]) {
 
 	while (running) {
 		ClearScreen(app.renderer);
-
 
 		checkOutOfFrame(nEntity, x, y, w, h, step, xRand, yRand);
 		moveEntity(nEntity, x, y, w, h, step, xRand, yRand);
