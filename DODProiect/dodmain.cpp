@@ -1,11 +1,12 @@
-
+#include <iostream>
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <SDL3/SDL_timer.h>
-#include <SDL3/SDL_stdinc.h>
-#include <iostream>
 #include <cstdlib>
 #include <ctime>
+#include <vector>
+#include <algorithm>
+
 
 
 namespace Colors {
@@ -18,15 +19,22 @@ namespace Colors {
 // About the game world
 namespace Graphics {
 	struct Screen {
-		const int width = 1800;
-		const int height = 900;
+		const int width = 1900;
+		const int height = 980;
 		const int messageSpace = 50;
 	};
 
 	struct entityDimensions {
 		const int w = 20;
 		const int h = 20;
-		const float step = 0.5;
+		const float step = 0.1;
+	};
+
+	struct gameData {
+		const int nEntity = 1000; // number of enities on the screen
+		// number of columns and rows for building the grid
+		const int nCols = 50; 
+		const int nRows = 50;
 	};
 
 }
@@ -39,10 +47,21 @@ struct App {
 
 	Graphics::Screen screen;
 	Graphics::entityDimensions dim;
+	Graphics::gameData gameData;
 
 	Uint64 totalFrameTicks = 0; // For fps
 
 } app;
+
+
+// Data structures for entity - grid
+
+std::vector<std::vector<int>> grids(
+	app.gameData.nCols* app.gameData.nRows,                   // number of cels
+	std::vector<int>(app.gameData.nEntity / (app.gameData.nCols * app.gameData.nRows), 0) // all the entities that can be in a cell
+);
+
+
 
 
 bool InitSDL() {
@@ -90,7 +109,7 @@ bool InitApplication() {
 		return false;
 	}
 
-	app.renderer = SDL_CreateRenderer(app.window, nullptr);
+	app.renderer = SDL_CreateRenderer(app.window, "opengl");
 
 
 	return true;
@@ -128,6 +147,7 @@ void create(int N, float*& x, float*& y, int*& w, int*& h, float*& step, float*&
 // draw entities as rectangles
 void drawEntities(int N, float* x, float* y, int* w, int* h, SDL_Renderer* renderer) {
 
+	SDL_SetRenderDrawColor(renderer, Colors::MINT.r, Colors::MINT.g, Colors::MINT.b, Colors::MINT.a);
 	for (int i = 0; i < N; i++) {
 		SDL_FRect rect;
 		rect.x = (float)x[i];
@@ -135,12 +155,13 @@ void drawEntities(int N, float* x, float* y, int* w, int* h, SDL_Renderer* rende
 		rect.h = (float)h[i];
 		rect.w = (float)w[i];
 
-		SDL_SetRenderDrawColor(renderer, Colors::MINT.r, Colors::MINT.g, Colors::MINT.b, Colors::MINT.a);
+		//SDL_SetRenderDrawColor(renderer, Colors::MINT.r, Colors::MINT.g, Colors::MINT.b, Colors::MINT.a);
 		SDL_RenderFillRect(renderer, &rect);
 
 	}
 
 }
+
 
 // move on the 0x 0y axes
 void moveEntity(int N, float*& x, float*& y, int* w, int* h, float* step, float* xRand, float* yRand) {
@@ -227,7 +248,7 @@ void collision(int N, float*& x, float*& y, float* step, float*& xRand, float*& 
 					overlapX = x[j] + w[j] - x[i];
 				}
 
-				if (x[i] < x[j]) {
+				if (y[i] < y[j]) {
 					overlapY = y[i] + h[i] - y[j];
 				}
 				else {
@@ -268,21 +289,111 @@ void collision(int N, float*& x, float*& y, float* step, float*& xRand, float*& 
 	}
 }
 
+void entityPositionGrid(float x[], float y[], int nrEntities) {
+	
+	int width_cell = app.screen.width / app.gameData.nCols;
+	int height_cell = (app.screen.height - app.screen.messageSpace) / app.gameData.nRows;
+	
+	for (int i = 0; i < app.gameData.nCols * app.gameData.nRows; i++)
+		grids[i].clear();
+
+	for (int i = 0; i < nrEntities; i++) {
+		int qx = x[i] / width_cell;
+		int qy = (y[i] - app.screen.messageSpace) / height_cell;
+
+		qx = std::clamp(qx, 0, app.gameData.nCols - 1);
+		qy = std::clamp(qy, 0, app.gameData.nRows - 1);
+
+
+		int quad = qx + app.gameData.nCols * qy;
+		grids[quad].push_back(i);
+	}
+
+	
+
+}
+
+void handleCollisions(int N, float*& x, float*& y, float* step, float*& xRand, float*& yRand, int* w, int* h) {
+	entityPositionGrid(x, y, N);
+
+	for (int k = 0; k < 50 * 50; k++) {
+		for (int m = 0; m < grids[k].size(); m++) {
+			int i = grids[k][m];
+			
+			for (int n = m + 1; n < grids[k].size(); n++) {	
+				int j = grids[k][n];
+
+				if (checkCollision(x[i], y[i], x[j], y[j], w[i], h[i], w[j], h[j])) {
+
+					float overlapX = 0.f;
+					float overlapY = 0.f;
+
+					if (x[i] < x[j]) {
+						overlapX = x[i] + w[i] - x[j];
+					}
+					else {
+						overlapX = x[j] + w[j] - x[i];
+					}
+
+					if (y[i] < y[j]) {
+						overlapY = y[i] + h[i] - y[j];
+					}
+					else {
+						overlapY = y[j] + h[j] - y[i];
+
+					}
+
+					if (overlapX < overlapY) {
+						xRand[i] = -xRand[i];
+						xRand[j] = -xRand[j];
+
+						if (x[i] < x[j]) {
+							x[i] = checkOutOfScreenX(x[i] - overlapX / 2, w[i]);
+							x[j] = checkOutOfScreenX(x[j] + overlapX / 2, w[j]);
+						}
+						else {
+							x[i] = checkOutOfScreenX(x[i] + overlapX / 2, w[i]);
+							x[j] = checkOutOfScreenX(x[j] - overlapX / 2, w[j]);
+						}
+					}
+
+					else {
+						yRand[i] = -yRand[i];
+						yRand[j] = -yRand[j];
+
+						if (y[i] < y[j]) {
+							y[i] = checkOutOfScreenY(y[i] - overlapY / 2, h[i]);
+							y[j] = checkOutOfScreenY(y[j] + overlapY / 2, h[j]);
+						}
+						else {
+							y[i] = checkOutOfScreenY(y[i] + overlapY / 2, h[i]);
+							y[j] = checkOutOfScreenY(y[j] - overlapY / 2, h[j]);
+						}
+					}
+				}
+
+			}
+
+		}
+
+	}
+
+}
+
+
 
 
 int main(int argc, char* argv[]) {
 
-	int nEntity = 20; // number of entities
+	float* x = new float[app.gameData.nEntity];
+	float* y = new float[app.gameData.nEntity];
+	float* step = new float[app.gameData.nEntity];
+	float* xRand = new float[app.gameData.nEntity]; // for x axis movement 
+	float* yRand = new float[app.gameData.nEntity]; // for y axis movement
+	int* w = new int[app.gameData.nEntity];
+	int* h = new int[app.gameData.nEntity];
 
-	float* x = new float[nEntity];
-	float* y = new float[nEntity];
-	float* step = new float[nEntity];
-	float* xRand = new float[nEntity]; // for x axis movement 
-	float* yRand = new float[nEntity]; // for y axis movement
-	int* w = new int[nEntity];
-	int* h = new int[nEntity];
-
-	create(nEntity, x, y, w, h, step, xRand, yRand);
+	create(app.gameData.nEntity, x, y, w, h, step, xRand, yRand);
 
 
 
@@ -302,11 +413,13 @@ int main(int argc, char* argv[]) {
 
 	while (running) {
 		ClearScreen(app.renderer);
+ 
+		handleCollisions(app.gameData.nEntity, x, y, step, xRand, yRand, w, h);
 
-		checkOutOfFrame(nEntity, x, y, w, h, step, xRand, yRand);
-		moveEntity(nEntity, x, y, w, h, step, xRand, yRand);
-		collision(nEntity, x, y, step, xRand, yRand, w, h);
-
+		checkOutOfFrame(app.gameData.nEntity, x, y, w, h, step, xRand, yRand);
+		moveEntity(app.gameData.nEntity, x, y, w, h, step, xRand, yRand);
+		//collision(app.gameData.nEntity, x, y, step, xRand, yRand, w, h);
+		
 
 		// keyboard events
 		while (SDL_PollEvent(&event)) {
@@ -329,7 +442,7 @@ int main(int argc, char* argv[]) {
 			}
 		}
 
-		drawEntities(nEntity, x, y, w, h, app.renderer);
+		drawEntities(app.gameData.nEntity, x, y, w, h, app.renderer);
 
 
 		// fps information
@@ -382,3 +495,8 @@ int main(int argc, char* argv[]) {
 	return EXIT_SUCCESS;
 
 }
+
+
+
+
+
