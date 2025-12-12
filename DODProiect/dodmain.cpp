@@ -34,7 +34,7 @@ namespace Graphics {
 		// number of columns and rows for building the grid
 		const int nCols = 128; // 64 
 		const int nRows = 72; // 36
-		const float step = 0.3;
+		const float step = 0.4;
 	};
 
 }
