@@ -6,7 +6,7 @@
 #include <ctime>
 #include <vector>
 #include <algorithm>
-
+#include <omp.h>
 
 
 namespace Colors {
@@ -19,22 +19,22 @@ namespace Colors {
 // About the game world
 namespace Graphics {
 	struct Screen {
-		const int width = 1900;
-		const int height = 980;
+		const int width = 1536;
+		const int height = 864;
 		const int messageSpace = 50;
 	};
 
 	struct entityDimensions {
-		const int w = 20;
-		const int h = 20;
-		const float step = 0.1;
+		const int w = 8;
+		const int h = 8;
 	};
 
 	struct gameData {
-		const int nEntity = 1000; // number of enities on the screen
+		const int nEntity = 100000; // number of enities on the screen
 		// number of columns and rows for building the grid
-		const int nCols = 50; 
-		const int nRows = 50;
+		const int nCols = 128; // 64 
+		const int nRows = 72; // 36
+		const float step = 0.3;
 	};
 
 }
@@ -57,7 +57,7 @@ struct App {
 // Data structures for entity - grid
 
 std::vector<std::vector<int>> grids(
-	app.gameData.nCols* app.gameData.nRows,                   // number of cels
+	app.gameData.nCols* app.gameData.nRows,            // number of cels
 	std::vector<int>(app.gameData.nEntity / (app.gameData.nCols * app.gameData.nRows), 0) // all the entities that can be in a cell
 );
 
@@ -116,14 +116,13 @@ bool InitApplication() {
 }
 
 // assign values for the entities
-void create(int N, float*& x, float*& y, int*& w, int*& h, float*& step, float*& xRand, float*& yRand) {
+void create(int N, float*& x, float*& y, int*& w, int*& h, float*& dirX, float*& dirY) {
+	
 	srand((unsigned)time(NULL));
 
 	for (int i = 0; i < N; i++) {
 		w[i] = app.dim.w;
 		h[i] = app.dim.h;
-		step[i] = app.dim.step;
-
 	}
 
 	for (int i = 0; i < N; i++) {
@@ -136,9 +135,9 @@ void create(int N, float*& x, float*& y, int*& w, int*& h, float*& step, float*&
 
 		// ex: rand() % (2 - (-2) + 1 ) + (-2) <=> rand() % 5 - 2  <=> 1 - 2 = -1
 		do {
-			xRand[i] = (float)(rand() % (maxVal - minVal + 1) + minVal);
-			yRand[i] = (float)(rand() % (maxVal - minVal + 1) + minVal);
-		} while (xRand[i] == 0 && yRand[i] == 0);
+			dirX[i] = (float)(rand() % (maxVal - minVal + 1) + minVal);
+			dirY[i] = (float)(rand() % (maxVal - minVal + 1) + minVal);
+		} while (dirX[i] == 0 && dirY[i] == 0);
 
 	}
 
@@ -155,7 +154,6 @@ void drawEntities(int N, float* x, float* y, int* w, int* h, SDL_Renderer* rende
 		rect.h = (float)h[i];
 		rect.w = (float)w[i];
 
-		//SDL_SetRenderDrawColor(renderer, Colors::MINT.r, Colors::MINT.g, Colors::MINT.b, Colors::MINT.a);
 		SDL_RenderFillRect(renderer, &rect);
 
 	}
@@ -164,43 +162,46 @@ void drawEntities(int N, float* x, float* y, int* w, int* h, SDL_Renderer* rende
 
 
 // move on the 0x 0y axes
-void moveEntity(int N, float*& x, float*& y, int* w, int* h, float* step, float* xRand, float* yRand) {
+void moveEntity(int N, float*& x, float*& y, int* w, int* h, float* dirX, float* dirY) {
 
 	for (int i = 0; i < N; i++) {
-		x[i] = x[i] + xRand[i] * step[i];
-		y[i] = y[i] + yRand[i] * step[i];
+		x[i] = x[i] + dirX[i] * app.gameData.step;
+		y[i] = y[i] + dirY[i] * app.gameData.step;
 	}
 }
 
 
+
 // entities can't escape the window, if they collide with the window they bounce back in the opposite direction
-void checkOutOfFrame(int N, float*& x, float*& y, int* w, int* h, float* step, float*& xRand, float*& yRand) {
+
+void checkOutOfFrame(int N, float*& x, float*& y, int* w, int* h, float*& velX, float*& velY) {
 	
 	for (int i = 0; i < N; i++) {
-		float futureX = x[i] + xRand[i] * step[i];
-		float futureY = y[i] + yRand[i] * step[i];
+		float futureX = x[i] + velX[i] * app.gameData.step;
+		float futureY = y[i] + velY[i] * app.gameData.step;
 
 		if (futureX < 0) {
 			x[i] = 0.f;
-			xRand[i] = -xRand[i];
+			velX[i] = -velX[i];
 		}
 		else if (futureX + w[i] >= app.screen.width) {
 			x[i] = (float)app.screen.width - w[i];
-			xRand[i] = -xRand[i];
+			velX [i] = - velX[i];
 		}
 
 		if (futureY < app.screen.messageSpace) {
 			y[i] = (float)app.screen.messageSpace;
-			yRand[i] = -yRand[i];
+			velY[i] = -velY[i];
 
 		}
 		else if (futureY + h[i] >= app.screen.height) {
 			y[i] = (float)app.screen.height - h[i];
-			yRand[i] = -yRand[i];
+			velY[i] = -velY[i];
 		}
 
 	}
 }
+
 
 // check if after the entities collision the entities are still in the window after the coordinate change
 float checkOutOfScreenX(float x, int w) {
@@ -225,14 +226,13 @@ float checkOutOfScreenY(float y, int h) {
 	return y;
 }
 
-
 // check if the entities collide
 bool checkCollision(float x1, float y1, float x2, float y2, int w1, int h1, int w2, int h2) {
 	return (x1 < x2 + w2) && (x1 + w1 > x2) && (y1 < y2 + h2) && (y1 + h1 > y2);
 }
 
 //  if 2 entities collide they move in the opposite direction and also bounce with half the distance of the entites overlap
-void collision(int N, float*& x, float*& y, float* step, float*& xRand, float*& yRand, int* w, int* h) {
+void collision(int N, float*& x, float*& y, float*& velX, float*& velY, int* w, int* h) {
 
 	for (int i = 0; i < N; i++) {
 		for (int j = i + 1; j < N; j++) {
@@ -257,8 +257,8 @@ void collision(int N, float*& x, float*& y, float* step, float*& xRand, float*& 
 				}
 
 				if (overlapX < overlapY) {
-					xRand[i] = -xRand[i];
-					xRand[j] = -xRand[j];
+					velX[i] = -velX[i];
+					velX[j] = -velX[j];
 
 					if (x[i] < x[j]) {
 						x[i] = checkOutOfScreenX(x[i] - overlapX / 2, w[i]);
@@ -271,8 +271,8 @@ void collision(int N, float*& x, float*& y, float* step, float*& xRand, float*& 
 				}
 
 				else {
-					yRand[i] = -yRand[i];
-					yRand[j] = -yRand[j];
+					velY[i] = -velY[i];
+					velY[j] = -velY[j];
 
 					if (y[i] < y[j]) {
 						y[i] = checkOutOfScreenY(y[i] - overlapY / 2, h[i]);
@@ -291,8 +291,8 @@ void collision(int N, float*& x, float*& y, float* step, float*& xRand, float*& 
 
 void entityPositionGrid(float x[], float y[], int nrEntities) {
 	
-	int width_cell = app.screen.width / app.gameData.nCols;
-	int height_cell = (app.screen.height - app.screen.messageSpace) / app.gameData.nRows;
+	int width_cell =(int) app.screen.width / app.gameData.nCols;
+	int height_cell =(int) (app.screen.height - app.screen.messageSpace) / app.gameData.nRows;
 	
 	for (int i = 0; i < app.gameData.nCols * app.gameData.nRows; i++)
 		grids[i].clear();
@@ -303,22 +303,24 @@ void entityPositionGrid(float x[], float y[], int nrEntities) {
 
 		qx = std::clamp(qx, 0, app.gameData.nCols - 1);
 		qy = std::clamp(qy, 0, app.gameData.nRows - 1);
-
+		
 
 		int quad = qx + app.gameData.nCols * qy;
 		grids[quad].push_back(i);
 	}
 
-	
 
 }
 
-void handleCollisions(int N, float*& x, float*& y, float* step, float*& xRand, float*& yRand, int* w, int* h) {
-	entityPositionGrid(x, y, N);
 
-	for (int k = 0; k < 50 * 50; k++) {
+// handle collison between enitites where the entity is verified to collide only in it's grid
+void handleCollisionsOrig(int N, float*& x, float*& y, float*& velX, float*& velY, int* w, int* h) {
+	entityPositionGrid(x, y, N);
+	
+	#pragma omp parallel for
+	for (int k = 0; k < app.gameData.nCols * app.gameData.nRows; k++) {
 		for (int m = 0; m < grids[k].size(); m++) {
-			int i = grids[k][m];
+			int i = grids[k][m]; // index of an entity
 			
 			for (int n = m + 1; n < grids[k].size(); n++) {	
 				int j = grids[k][n];
@@ -344,8 +346,8 @@ void handleCollisions(int N, float*& x, float*& y, float* step, float*& xRand, f
 					}
 
 					if (overlapX < overlapY) {
-						xRand[i] = -xRand[i];
-						xRand[j] = -xRand[j];
+						velX[i] = -velX[i];
+						velX[j] = -velX[j];
 
 						if (x[i] < x[j]) {
 							x[i] = checkOutOfScreenX(x[i] - overlapX / 2, w[i]);
@@ -358,8 +360,8 @@ void handleCollisions(int N, float*& x, float*& y, float* step, float*& xRand, f
 					}
 
 					else {
-						yRand[i] = -yRand[i];
-						yRand[j] = -yRand[j];
+						velY[i] = -velY[i];
+						velY[j] = -velY[j];
 
 						if (y[i] < y[j]) {
 							y[i] = checkOutOfScreenY(y[i] - overlapY / 2, h[i]);
@@ -380,6 +382,108 @@ void handleCollisions(int N, float*& x, float*& y, float* step, float*& xRand, f
 
 }
 
+void modifyAfterCollision(float& x1, float& x2, float& y1, float& y2, float& dirX1, float& dirY1, float& dirX2, float& dirY2, int w1, int w2,int h1, int h2) {
+
+	float overlapX = 0.f;
+	float overlapY = 0.f;
+
+	if (x1 < x2) {
+		overlapX = x1 + w1 - x2;
+	}
+	else {
+		overlapX = x2 + w2 - x1;
+	}
+
+	if (y1 < y2) {
+		overlapY = y1 + h1 - 2;
+	}
+	else {
+		overlapY = y2 + h2 - y1;
+
+	}
+
+	if (overlapX < overlapY) {
+		dirX1 = -dirX1;
+		dirX2 = -dirX2;
+
+		if (x1 < x2) {
+			x1 = checkOutOfScreenX(x1 - overlapX / 2, w1);
+			x2 = checkOutOfScreenX(x2 + overlapX / 2, w2);
+		}
+		else {
+			x1 = checkOutOfScreenX(x1 + overlapX / 2, w1);
+			x2 = checkOutOfScreenX(x2 - overlapX / 2, w2);
+		}
+	}
+
+	else {
+		dirY1 = -dirY1;
+		dirY2 = -dirY2;
+
+		if (y1 < y2) {
+			y1 = checkOutOfScreenY(y1 - overlapY / 2, h1);
+			y2 = checkOutOfScreenY(y2 + overlapY / 2, h2);
+		}
+		else {
+			y1 = checkOutOfScreenY(y1 + overlapY / 2, h1);
+			y2 = checkOutOfScreenY(y2 - overlapY / 2, h2);
+		}
+	}
+
+}
+
+
+// collison with neighbor grids
+void handleCollisionsNeigh(int N, float*& x, float*& y, float*& dirX, float*& dirY, int* w, int* h) {
+	entityPositionGrid(x, y, N);
+
+	#pragma omp parallel for
+	for (int k = 0; k < app.gameData.nCols * app.gameData.nRows; k++) {
+		
+		for (int m = 0; m < grids[k].size(); m++) {
+			int i = grids[k][m]; // index of an entity
+
+			for (int n = m + 1; n < grids[k].size(); n++) {
+				int j = grids[k][n];
+
+				if (checkCollision(x[i], y[i], x[j], y[j], w[i], h[i], w[j], h[j])) {
+					modifyAfterCollision(x[i], x[j], y[i], y[j], dirX[i], dirY[i], dirX[j], dirY[j], w[i], w[j], h[i], h[j]);
+				}	
+			}
+
+			int c1 = 4; 
+			int c2 = 5; 
+		
+			if (k - c1 < 0) c1 = k;
+			if (k + c2 >= app.gameData.nCols * app.gameData.nRows) c2 = app.gameData.nCols * app.gameData.nRows - 1 - k;
+
+			
+			for (int o = k - c1; o < k; o++) {
+				for (int idx = 0; idx < grids[o].size(); idx++) {
+					int id = grids[o][idx];
+
+					if (checkCollision(x[i], y[i], x[id], y[id], w[i], h[i], w[id], h[id])) {
+						modifyAfterCollision(x[i], x[id], y[i], y[id], dirX[i], dirY[i], dirX[id], dirY[id], w[i], w[id], h[i], h[id]);
+					}
+				}
+			}
+
+			for (int p = k + 1; p <= k + c2; p++) {
+				for (int idx = 0; idx < grids[p].size(); idx++) {
+					int id = grids[p][idx];
+
+					if (checkCollision(x[i], y[i], x[id], y[id], w[i], h[i], w[id], h[id])) {
+						modifyAfterCollision(x[i], x[id], y[i], y[id], dirX[i], dirY[i], dirX[id], dirY[id], w[i], w[id], h[i], h[id]);
+					}
+				}
+			}
+
+		}
+
+	}
+
+}
+
 
 
 
@@ -387,15 +491,12 @@ int main(int argc, char* argv[]) {
 
 	float* x = new float[app.gameData.nEntity];
 	float* y = new float[app.gameData.nEntity];
-	float* step = new float[app.gameData.nEntity];
-	float* xRand = new float[app.gameData.nEntity]; // for x axis movement 
-	float* yRand = new float[app.gameData.nEntity]; // for y axis movement
+	float* dirX = new float[app.gameData.nEntity]; // direction on the x axis
+	float* dirY = new float[app.gameData.nEntity]; // direction on the y axis
 	int* w = new int[app.gameData.nEntity];
 	int* h = new int[app.gameData.nEntity];
-
-	create(app.gameData.nEntity, x, y, w, h, step, xRand, yRand);
-
-
+	
+	create(app.gameData.nEntity, x, y, w, h, dirX, dirY);
 
 	if (!InitApplication()) {
 		ShutdownApplication();
@@ -414,11 +515,11 @@ int main(int argc, char* argv[]) {
 	while (running) {
 		ClearScreen(app.renderer);
  
-		handleCollisions(app.gameData.nEntity, x, y, step, xRand, yRand, w, h);
-
-		checkOutOfFrame(app.gameData.nEntity, x, y, w, h, step, xRand, yRand);
-		moveEntity(app.gameData.nEntity, x, y, w, h, step, xRand, yRand);
-		//collision(app.gameData.nEntity, x, y, step, xRand, yRand, w, h);
+		//handleCollisionsOrig(app.gameData.nEntity, x, y, dirX, dirY, w, h);
+		handleCollisionsNeigh(app.gameData.nEntity, x, y, dirX, dirY, w, h);
+		moveEntity(app.gameData.nEntity, x, y, w, h, dirX, dirY);
+		checkOutOfFrame(app.gameData.nEntity, x, y, w, h, dirX, dirY);
+		//collision(app.gameData.nEntity, x, y, dirX, dirY, w, h);
 		
 
 		// keyboard events
@@ -448,7 +549,7 @@ int main(int argc, char* argv[]) {
 		// fps information
 		Uint64 endCounter = SDL_GetPerformanceCounter();
 		Uint64 counterElapsed = endCounter - lastCounter;
-
+		
 		double MSPerFrame = (((1000.0f * (double)counterElapsed) / (double)perCountFrequency));
 		double FPS = (double)perCountFrequency / (double)counterElapsed;
 
@@ -485,9 +586,8 @@ int main(int argc, char* argv[]) {
 	delete[] y;
 	delete[] w;
 	delete[] h;
-	delete[] xRand;
-	delete[] yRand;
-	delete[] step;
+	delete[] dirX;
+	delete[] dirY;
 
 
 	ShutdownApplication();
@@ -495,7 +595,6 @@ int main(int argc, char* argv[]) {
 	return EXIT_SUCCESS;
 
 }
-
 
 
 
