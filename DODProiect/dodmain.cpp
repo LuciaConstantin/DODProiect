@@ -1,4 +1,4 @@
-#include <iostream>
+﻿#include <iostream>
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <SDL3/SDL_timer.h>
@@ -7,7 +7,15 @@
 #include <vector>
 #include <algorithm>
 #include <omp.h>
+#include "imgui.h"
+#include "imgui_impl_sdl3.h"
+#include "imgui_impl_sdlrenderer3.h"
+#include <stdio.h>
 
+
+#ifdef __EMSCRIPTEN__
+#include "../libs/emscripten/emscripten_mainloop_stub.h"
+#endif
 
 namespace Colors {
 	const SDL_Color BLACK = { 0, 0, 0, SDL_ALPHA_OPAQUE };
@@ -30,7 +38,8 @@ namespace Graphics {
 	};
 
 	struct gameData {
-		const int nEntity = 100000; // number of enities on the screen
+		const int maxEntities = 100000; // number of enities on the screen
+		int entityNumber = 10000;
 		// number of columns and rows for building the grid
 		const int nCols = 128; // 64 
 		const int nRows = 72; // 36
@@ -45,6 +54,11 @@ struct App {
 	SDL_Window* window = nullptr;
 	SDL_Renderer* renderer = nullptr;
 
+	SDL_Window* menuWindow = nullptr;
+	SDL_Renderer* menuRenderer = nullptr;
+
+	float main_scale = 0.f;
+
 	Graphics::Screen screen;
 	Graphics::entityDimensions dim;
 	Graphics::gameData gameData;
@@ -58,18 +72,17 @@ struct App {
 
 std::vector<std::vector<int>> grids(
 	app.gameData.nCols* app.gameData.nRows,            // number of cels
-	std::vector<int>(app.gameData.nEntity / (app.gameData.nCols * app.gameData.nRows), 0) // all the entities that can be in a cell
+	std::vector<int>(app.gameData.maxEntities / (app.gameData.nCols * app.gameData.nRows), 0) // all the entities that can be in a cell
 );
 
 
 
 
 bool InitSDL() {
-	if (!SDL_Init(SDL_INIT_VIDEO)) {
+	if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)){
 		std::cout << "SDL_Init failed with error: " << SDL_GetError() << std::endl;
 		return false;
 	}
-
 	return true;
 }
 
@@ -111,6 +124,29 @@ bool InitApplication() {
 
 	app.renderer = SDL_CreateRenderer(app.window, "opengl");
 
+
+	return true;
+}
+
+bool InitApplicationMenu() {
+	app.main_scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
+	SDL_WindowFlags window_flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN | SDL_WINDOW_HIGH_PIXEL_DENSITY;
+	app.menuWindow = SDL_CreateWindow("Game menu", (int)(500 * app.main_scale), (int)(250 * app.main_scale), window_flags);
+	if (app.menuWindow == nullptr)
+	{
+		printf("Error: SDL_CreateWindow(): %s\n", SDL_GetError());
+		return false;
+	}
+	app.menuRenderer = SDL_CreateRenderer(app.menuWindow, nullptr);
+	SDL_SetRenderVSync(app.menuRenderer, 1);
+	
+	if (app.menuRenderer == nullptr)
+	{
+		SDL_Log("Error: SDL_CreateRenderer(): %s\n", SDL_GetError());
+		return false;
+	}
+	SDL_SetWindowPosition(app.menuWindow, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+	SDL_ShowWindow(app.menuWindow);
 
 	return true;
 }
@@ -395,7 +431,7 @@ void modifyAfterCollision(float& x1, float& x2, float& y1, float& y2, float& dir
 	}
 
 	if (y1 < y2) {
-		overlapY = y1 + h1 - 2;
+		overlapY = y1 + h1 - y2;
 	}
 	else {
 		overlapY = y2 + h2 - y1;
@@ -489,16 +525,22 @@ void handleCollisionsNeigh(int N, float*& x, float*& y, float*& dirX, float*& di
 
 int main(int argc, char* argv[]) {
 
-	float* x = new float[app.gameData.nEntity];
-	float* y = new float[app.gameData.nEntity];
-	float* dirX = new float[app.gameData.nEntity]; // direction on the x axis
-	float* dirY = new float[app.gameData.nEntity]; // direction on the y axis
-	int* w = new int[app.gameData.nEntity];
-	int* h = new int[app.gameData.nEntity];
+	float* x = new float[app.gameData.maxEntities];
+	float* y = new float[app.gameData.maxEntities];
+	float* dirX = new float[app.gameData.maxEntities]; // direction on the x axis
+	float* dirY = new float[app.gameData.maxEntities]; // direction on the y axis
+	int* w = new int[app.gameData.maxEntities];
+	int* h = new int[app.gameData.maxEntities];
 	
-	create(app.gameData.nEntity, x, y, w, h, dirX, dirY);
+	
+	create(app.gameData.maxEntities, x, y, w, h, dirX, dirY);
 
 	if (!InitApplication()) {
+		ShutdownApplication();
+		return EXIT_FAILURE;
+	}
+
+	if (!InitApplicationMenu()) {
 		ShutdownApplication();
 		return EXIT_FAILURE;
 	}
@@ -512,18 +554,53 @@ int main(int argc, char* argv[]) {
 	double totalTimeMs = 0;
 	unsigned int frameCount = 0;
 
-	while (running) {
+	// Setup Dear ImGui context
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	ImGuiIO& io = ImGui::GetIO(); (void)io;
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+
+	// Setup Dear ImGui style
+	ImGui::StyleColorsDark();
+	//ImGui::StyleColorsLight();
+
+	// Setup scaling
+	ImGuiStyle& style = ImGui::GetStyle();
+	style.ScaleAllSizes(app.main_scale);        
+	style.FontScaleDpi = app.main_scale;  
+
+	// Setup Platform/Renderer backends
+	ImGui_ImplSDL3_InitForSDLRenderer(app.menuWindow, app.menuRenderer);
+	ImGui_ImplSDLRenderer3_Init(app.menuRenderer);
+
+
+
+
+#ifdef __EMSCRIPTEN__
+	io.IniFilename = nullptr;
+	EMSCRIPTEN_MAINLOOP_BEGIN
+#else
+	while (running)
+#endif
+	{ 
 		ClearScreen(app.renderer);
  
-		//handleCollisionsOrig(app.gameData.nEntity, x, y, dirX, dirY, w, h);
-		handleCollisionsNeigh(app.gameData.nEntity, x, y, dirX, dirY, w, h);
-		moveEntity(app.gameData.nEntity, x, y, w, h, dirX, dirY);
-		checkOutOfFrame(app.gameData.nEntity, x, y, w, h, dirX, dirY);
+		handleCollisionsOrig(app.gameData.entityNumber, x, y, dirX, dirY, w, h);
+		//handleCollisionsNeigh(app.gameData.entityNumber, x, y, dirX, dirY, w, h);
+		moveEntity(app.gameData.entityNumber, x, y, w, h, dirX, dirY);
+		checkOutOfFrame(app.gameData.entityNumber, x, y, w, h, dirX, dirY);
 		//collision(app.gameData.nEntity, x, y, dirX, dirY, w, h);
 		
 
 		// keyboard events
 		while (SDL_PollEvent(&event)) {
+			ImGui_ImplSDL3_ProcessEvent(&event);
+			if (event.type == SDL_EVENT_QUIT)
+				running = false;
+			if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED && event.window.windowID == SDL_GetWindowID(app.menuWindow))
+				running = false;
+
 			switch (event.type) {
 			case SDL_EVENT_KEY_DOWN:
 				if (event.key.scancode == SDL_SCANCODE_ESCAPE)
@@ -543,7 +620,7 @@ int main(int argc, char* argv[]) {
 			}
 		}
 
-		drawEntities(app.gameData.nEntity, x, y, w, h, app.renderer);
+		drawEntities(app.gameData.entityNumber, x, y, w, h, app.renderer);
 
 
 		// fps information
@@ -568,7 +645,41 @@ int main(int argc, char* argv[]) {
 		SDL_asprintf(&avg, "Average FPS: %.2f", avgFPS);
 		SDL_asprintf(&ms, "Frame Time(ms): %.2f", MSPerFrame);
 
+		// Start the Dear ImGui frame
+		ImGui_ImplSDLRenderer3_NewFrame();
+		ImGui_ImplSDL3_NewFrame();
+		ImGui::NewFrame();
 
+
+		// 2. Show a simple window that we create ourselves. We use a Begin/End pair to create a named window.
+		{
+			
+			static int counter = 0;
+
+
+			ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
+			ImGui::SetNextWindowSize(ImVec2((int)(500 * app.main_scale), (int)(250 * app.main_scale)), ImGuiCond_Always);
+
+
+			ImGui::Begin("Modify game data");               
+
+			ImGui::Text("Change game parameters");   
+
+			ImGui::SliderInt("Number of entities", &app.gameData.entityNumber, 0, 100000);
+
+			ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+			ImGui::End();
+		}
+
+
+
+		// Rendering
+		ImGui::Render();
+		SDL_SetRenderScale(app.menuRenderer, io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
+		SDL_RenderClear(app.menuRenderer);
+		ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), app.menuRenderer);
+		SDL_RenderPresent(app.menuRenderer);
+	
 
 		SDL_SetRenderDrawColor(app.renderer, 255, 255, 255, 255);
 		SDL_RenderDebugText(app.renderer, 10, 10, fps);
@@ -581,6 +692,19 @@ int main(int argc, char* argv[]) {
 
 	}
 
+#ifdef __EMSCRIPTEN__
+	EMSCRIPTEN_MAINLOOP_END;
+#endif
+
+	// Cleanup
+	// [If using SDL_MAIN_USE_CALLBACKS: all code below would likely be your SDL_AppQuit() function]
+	ImGui_ImplSDLRenderer3_Shutdown();
+	ImGui_ImplSDL3_Shutdown();
+	ImGui::DestroyContext();
+
+	SDL_DestroyRenderer(app.menuRenderer);
+	SDL_DestroyWindow(app.menuWindow);
+	SDL_Quit();
 
 	delete[] x;
 	delete[] y;
@@ -595,7 +719,4 @@ int main(int argc, char* argv[]) {
 	return EXIT_SUCCESS;
 
 }
-
-
-
 
