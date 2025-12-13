@@ -20,8 +20,9 @@
 namespace Colors {
 	const SDL_Color BLACK = { 0, 0, 0, SDL_ALPHA_OPAQUE };
 	const SDL_Color GREEN = { 0, 255, 0, SDL_ALPHA_OPAQUE };
-	const SDL_Color WHITE = { 255, 255, 255, SDL_ALPHA_OPAQUE };
+	const SDL_Color WHITE = { 189, 160, 177, SDL_ALPHA_OPAQUE };
 	const SDL_Color MINT = { 143, 206, 150, SDL_ALPHA_OPAQUE };
+	const SDL_Color PURPLE = { 204, 108, 172 , SDL_ALPHA_OPAQUE };
 }
 
 // About the game world
@@ -43,7 +44,9 @@ namespace Graphics {
 		// number of columns and rows for building the grid
 		const int nCols = 128; // 64 
 		const int nRows = 72; // 36
-		const float step = 0.4;
+		const int gridDistance = 12;
+		const float step = 0.4; // entity speed
+		
 	};
 
 }
@@ -182,7 +185,7 @@ void create(int N, float*& x, float*& y, int*& w, int*& h, float*& dirX, float*&
 // draw entities as rectangles
 void drawEntities(int N, float* x, float* y, int* w, int* h, SDL_Renderer* renderer) {
 
-	SDL_SetRenderDrawColor(renderer, Colors::MINT.r, Colors::MINT.g, Colors::MINT.b, Colors::MINT.a);
+	SDL_SetRenderDrawColor(renderer, Colors::PURPLE.r, Colors::PURPLE.g, Colors::PURPLE.b, Colors::PURPLE.a);
 	for (int i = 0; i < N; i++) {
 		SDL_FRect rect;
 		rect.x = (float)x[i];
@@ -194,6 +197,18 @@ void drawEntities(int N, float* x, float* y, int* w, int* h, SDL_Renderer* rende
 
 	}
 
+}
+
+void drawGrid(SDL_Renderer* renderer) {
+
+	SDL_SetRenderDrawColor(renderer, Colors::WHITE.r, Colors::WHITE.g, Colors::WHITE.b, Colors::WHITE.a);
+	for (int i = 0; i < app.gameData.nCols; i++) {
+		SDL_RenderLine(renderer, i * app.gameData.gridDistance, app.screen.messageSpace, i * app.gameData.gridDistance, app.screen.height);
+	}
+
+	for (int i = 0; i < app.gameData.nRows; i++) {
+		SDL_RenderLine(renderer, 0, i * app.gameData.gridDistance + app.screen.messageSpace , app.screen.width, i * app.gameData.gridDistance + app.screen.messageSpace);
+	}
 }
 
 
@@ -621,7 +636,7 @@ int main(int argc, char* argv[]) {
 		}
 
 		drawEntities(app.gameData.entityNumber, x, y, w, h, app.renderer);
-
+		
 
 		// fps information
 		Uint64 endCounter = SDL_GetPerformanceCounter();
@@ -650,13 +665,9 @@ int main(int argc, char* argv[]) {
 		ImGui_ImplSDL3_NewFrame();
 		ImGui::NewFrame();
 
-
-		// 2. Show a simple window that we create ourselves. We use a Begin/End pair to create a named window.
+		static bool showGrid = false;
 		{
 			
-			static int counter = 0;
-
-
 			ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
 			ImGui::SetNextWindowSize(ImVec2((int)(500 * app.main_scale), (int)(250 * app.main_scale)), ImGuiCond_Always);
 
@@ -667,11 +678,18 @@ int main(int argc, char* argv[]) {
 
 			ImGui::SliderInt("Number of entities", &app.gameData.entityNumber, 0, 100000);
 
+			ImGui::Checkbox("Show grid", &showGrid);
+
 			ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+
 			ImGui::End();
 		}
 
+		if (showGrid) {
+			drawGrid(app.renderer);
 
+		}
+		
 
 		// Rendering
 		ImGui::Render();
